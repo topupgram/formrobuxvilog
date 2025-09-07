@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Formulir Pembelian Robux VILOG</title>
+<style>
+  :root{
+    --accent:#8296AD;
+    --muted:#C9DBF0;
+    --wa:#25D366;
+    --tg:#0088cc;
+  }
+  body{font-family:Roboto,Arial,sans-serif;background:#f4f6f8;padding:18px;}
+  .card{max-width:720px;margin:14px auto;padding:14px;border-radius:12px;background:#fff;border:2px solid var(--accent);}
+  h2{margin:0 0 12px 0;text-align:center;background:var(--muted);padding:10px;border-radius:8px;}
+  label{display:block;margin:8px 0 4px 0;font-size:13px;}
+  .form-input, .form-select, .form-textarea {
+    width:100%; padding:8px; margin-bottom:6px; border:1px solid #ccc; border-radius:6px;
+    font-family:Roboto,Arial,sans-serif; font-size:13px;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus {
+    outline:none; border-color:var(--accent); box-shadow:0 0 4px rgba(130,150,173,0.5);
+  }
+  .btn-row{display:flex;gap:8px;margin-top:12px;}
+  .btn{flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:600}
+  .btn-wa{background:var(--wa);color:#fff}
+  .btn-tg{background:var(--tg);color:#fff}
+  /* popup */
+  #popupPreview{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;padding:18px;}
+  #popupCard{background:#fff;padding:16px;border-radius:12px;max-width:540px;width:100%;}
+  pre#previewText{white-space:pre-wrap;background:#f9f9f9;padding:10px;border:1px dashed var(--accent);border-radius:8px;font-size:13px;max-height:180px;overflow:auto;}
+  .small-muted{font-size:12px;color:#555}
+  .qris-box{margin:12px 0;text-align:center}
+  .qris-box img{max-width:220px;border:2px solid var(--accent);border-radius:8px}
+  #totalBayarInfo{margin-top:10px;font-family:Roboto,Arial,sans-serif;font-weight:bold;color:#e53935;font-size:16px;}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h2>Formulir Pembelian Robux VILOG</h2>
+
+  <label>Nama / Inisial: *</label>
+  <input id="nama" class="form-input" type="text">
+
+  <label>Username Roblox: *</label>
+  <input id="roblox_user" class="form-input" type="text">
+
+  <label>Password Roblox: *</label>
+  <input id="roblox_pass" class="form-input" type="password">
+
+  <label>Verifikasi 2 Langkah (V2L): *</label>
+  <select id="v2l" class="form-select" onchange="toggleBackup()">
+    <option value="">-- Pilih --</option>
+    <option value="OFF">OFF</option>
+    <option value="ON">ON</option>
+  </select>
+
+  <div id="backup_wrap" style="display:none;">
+    <label>Backup Codes (jika V2L ON): *</label>
+    <textarea id="backup" rows="2" class="form-textarea" placeholder="Pastikan backup code yang dimasukkan belum digunakan"></textarea>
+  </div>
+
+  <label>Kategori Robux: *</label>
+  <select id="kategori" class="form-select" onchange="populateNominal()">
+    <option value="">-- Pilih Kategori --</option>
+    <option value="reguler">Robux Reguler</option>
+    <option value="special">Robux Special</option>
+  </select>
+
+  <label>Jumlah Order: *</label>
+  <select id="jumlah" class="form-select"></select>
+
+  <label>Metode Pembayaran: *</label>
+  <select id="bayar" class="form-select">
+    <option value="">-- Pilih Metode --</option>
+    <option>DANA</option>
+    <option>GoPay</option>
+    <option>ShopeePay</option>
+    <option>Seabank</option>
+    <option>QRIS All Payment</option>
+  </select>
+
+  <!-- Username Telegram (hanya muncul jika pilih Telegram) -->
+  <div id="tg_user_wrap" style="display:none;">
+    <label>Username Telegram (wajib jika order via Telegram):</label>
+    <input id="tg_user" class="form-input" type="text" placeholder="@username">
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-wa" onclick="previewOrder('wa')">Pesan via WhatsApp</button>
+    <button class="btn btn-tg" onclick="previewOrder('tg')">Pesan via Telegram</button>
+  </div>
+</div>
+
+<!-- Popup Preview -->
+<div id="popupPreview">
+  <div id="popupCard">
+    <h3 style="margin-top:0;text-align:center">Konfirmasi Pesanan</h3>
+    <pre id="previewText"></pre>
+
+    <div class="qris-box">
+      <div class="small-muted">Silakan lakukan pembayaran melalui QRIS berikut:</div>
+      <img src="https://payment.uwu.ai/assets/images/gallery03/8555ed8a_original.jpg?v=7e98031a" alt="QRIS Pembayaran">
+      <div id="totalBayarInfo"></div>
+    </div>
+
+    <label>Upload Bukti Bayar (wajib):</label>
+    <input id="bukti" class="form-input" type="file" accept="image/*">
+
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button id="confirmBtn" class="btn" style="background:#4CAF50;color:#fff;flex:1">Konfirmasi & Kirim</button>
+      <button onclick="closePreview()" class="btn" style="background:#ccc;flex:1">Batal</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* CONFIG */
+const CLOUD_NAME = "dcnlivyan";
+const UPLOAD_PRESET = "TPG_Bukti_Pembayaran";
+const WA_NUMBER = "6283197962700";
+const TG_TOKEN = "2041499676:AAHcQZwSM86v4TwqJEB0-52yzYF5sN9mU5M";
+const TG_CHAT_ID = "-1002053067081";
+
+/* PRICE LIST */
+const priceReguler = {
+ "80 Robux":16000,"160 Robux":32000,"240 Robux":44500,"320 Robux":58000,"400 Robux":70000,
+ "480 Robux":85500,"560 Robux":102000,"640 Robux":114500,"720 Robux":128000,"800 Robux":139000,
+ "1700 Robux":278000,"2100 Robux":347000,"2500 Robux":416000,"3400 Robux":560000,"4500 Robux":698000,
+ "10000 Robux":1390000,"22500 Robux":2780000
+};
+const priceSpecial = {
+ "500 Robux":75500,"1000 Robux":150000,"2000 Robux":298000,"3000 Robux":447000,"4500 Robux":698000
+};
+
+/* Populate dropdown nominal */
+function populateNominal(){
+  const sel = document.getElementById('jumlah');
+  sel.innerHTML = '<option value="">-- Pilih Nominal --</option>';
+  const kat = document.getElementById('kategori').value;
+  const list = (kat==='reguler')?priceReguler:(kat==='special')?priceSpecial:{};
+  Object.keys(list).forEach(k=>{
+    const opt=document.createElement('option');
+    opt.value=k; opt.text=`${k} — Rp ${numberWithDots(list[k])}`;
+    sel.appendChild(opt);
+  });
+}
+function numberWithDots(x){return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g,".");}
+function toggleBackup(){document.getElementById('backup_wrap').style.display=(document.getElementById('v2l').value==="ON")?"block":"none";}
+
+/* Order code generator */
+function generateOrderCode(){
+  const now=new Date();
+  const dd=String(now.getDate()).padStart(2,'0');
+  const mm=String(now.getMonth()+1).padStart(2,'0');
+  const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let rnd=''; for(let i=0;i<3;i++){rnd+=letters.charAt(Math.floor(Math.random()*letters.length));}
+  let counter=parseInt(localStorage.getItem('orderCounter')||'0',10)+1;
+  localStorage.setItem('orderCounter',counter);
+  return `#TPG${dd}${mm}${rnd}${String(counter).padStart(4,'0')}`;
+}
+
+let lastMessageText='',currentMethod='wa';
+
+function previewOrder(method){
+  currentMethod=method;
+  document.getElementById('tg_user_wrap').style.display = (method==='tg') ? 'block' : 'none';
+
+  const nama=document.getElementById('nama').value.trim();
+  const ru=document.getElementById('roblox_user').value.trim();
+  const rp=document.getElementById('roblox_pass').value.trim();
+  const v2l=document.getElementById('v2l').value;
+  const backup=document.getElementById('backup').value.trim();
+  const kategori=document.getElementById('kategori').value;
+  const jumlah=document.getElementById('jumlah').value;
+  const bayar=document.getElementById('bayar').value;
+  const tg_user=document.getElementById('tg_user').value.trim();
+
+  // Validasi ketat
+  if(!nama||!ru||!rp||!v2l||!kategori||!jumlah||!bayar){
+    alert("Semua field wajib diisi.");
+    return;
+  }
+  if(v2l==="ON"&&!backup){
+    alert("Backup Codes wajib diisi jika V2L ON.");
+    return;
+  }
+  if(method==='tg' && !tg_user){
+    alert("Username Telegram wajib diisi jika order via Telegram.");
+    return;
+  }
+
+  const orderCode=generateOrderCode();
+  const harga=(kategori==='reguler')?priceReguler[jumlah]:priceSpecial[jumlah];
+  const hargaText=harga?`Rp ${numberWithDots(harga)}`:"Rp -";
+
+  const lines=[
+    `Kode Pesanan: ${orderCode}`,
+    `Nama: ${nama}`,
+    `Username Roblox: ${ru}`,
+    `Password Roblox: ${rp}`,
+    `V2L: ${v2l}`];
+  if(v2l==='ON') lines.push(`Backup Codes: ${backup}`);
+  lines.push(`Kategori: ${kategori}`);
+  lines.push(`Jumlah Order: ${jumlah}`);
+  lines.push(`Total Bayar: ${hargaText}`);
+  lines.push(`Metode Bayar: ${bayar}`);
+  if(method==='tg') lines.push(`Username Telegram: ${tg_user}`);
+
+  lastMessageText=lines.join("\n");
+  document.getElementById('previewText').innerText=lastMessageText;
+  document.getElementById('totalBayarInfo').innerText="Total Bayar: "+hargaText;
+  document.getElementById('popupPreview').style.display='flex';
+}
+
+function closePreview(){document.getElementById('popupPreview').style.display='none';}
+
+async function uploadToCloudinary(file){
+  const url=`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+  const fd=new FormData();
+  fd.append('file',file); fd.append('upload_preset',UPLOAD_PRESET);
+  try{const res=await fetch(url,{method:'POST',body:fd});const data=await res.json();return data.secure_url||null;}catch(err){console.error(err);return null;}
+}
+
+document.getElementById('confirmBtn').onclick=async function(){
+  const fileInput=document.getElementById('bukti');
+  let file=fileInput.files[0];
+  if(!file){
+    alert("Wajib upload bukti pembayaran sebelum konfirmasi.");
+    return;
+  }
+
+  let uploadedUrl=await uploadToCloudinary(file);
+
+  if(currentMethod==='wa'){
+    let pesan=lastMessageText+`\n\nBukti Bayar: ${uploadedUrl}`;
+    window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(pesan)}`,'_blank');
+    alert("Pesan WA disiapkan.");
+  }else{
+    await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendPhoto`,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({chat_id:TG_CHAT_ID,photo:uploadedUrl,caption:lastMessageText})
+    });
+    alert("Pesanan terkirim ke Telegram.");
+  }
+  closePreview();
+};
+</script>
+</body>
+</html>
